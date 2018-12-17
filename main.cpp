@@ -22,7 +22,28 @@
 
 #define MAX_BYTES_2_CAPTURE 2048
 
+using namespace std;
+queue<u_char *> Packetqueue;
+
+// Connection Information Structure
+struct ConnectInfo
+{
+    char SourIP[20];
+    char DestIP[20];
+    u_int SourPort;
+    u_int DestPort;
+    ServicePort ServPort;
+};
+
+// Service port number
+enum ServicePort
+{
+    http = 80
+};
+
+// Prototype
 void localip(pcap_if_t *name);
+void Inputqueue(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet);
 void processPacket(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet);
 
 int main(int argc, char const *argv[])
@@ -70,6 +91,7 @@ int main(int argc, char const *argv[])
     return 0;
 }
 
+// Get local IP address
 void localip(pcap_if_t *name)
 {
     int fd;
@@ -88,6 +110,12 @@ void localip(pcap_if_t *name)
     printf("Local IP address: %s\n", inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
 }
 
+// Input queue
+void Inputqueue(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet)
+{
+}
+
+// Packet process
 void processPacket(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet)
 {
     // Declare pointers to packet numbers
