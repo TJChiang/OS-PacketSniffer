@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <unistd.h>
+#include <iostream>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -23,7 +24,13 @@
 #define MAX_BYTES_2_CAPTURE 2048
 
 using namespace std;
-queue<u_char *> Packetqueue;
+queue<const u_char *> Packetqueue;
+
+// Service port number
+typedef enum
+{
+    http = 80
+} ServicePort;
 
 // Connection Information Structure
 struct ConnectInfo
@@ -35,16 +42,11 @@ struct ConnectInfo
     ServicePort ServPort;
 };
 
-// Service port number
-enum ServicePort
-{
-    http = 80
-};
-
 // Prototype
 void localip(pcap_if_t *name);
 void Inputqueue(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet);
-void processPacket(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet);
+// void processPacket(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet);
+void *processPacket(void *packet);
 
 int main(int argc, char const *argv[])
 {
@@ -86,7 +88,7 @@ int main(int argc, char const *argv[])
         return -1;
     }
 
-    pcap_loop(descr, -1, processPacket, (u_char *)&count);
+    pcap_loop(descr, -1, Inputqueue, (u_char *)&count);
 
     return 0;
 }
@@ -113,10 +115,25 @@ void localip(pcap_if_t *name)
 // Input queue
 void Inputqueue(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet)
 {
+    Packetqueue.push(packet);
+
+    if (Packetqueue.size() >= 100)
+    {
+        pthread_t thread[100];
+        for (int i = 0; i < 100; i++)
+        {
+            pthread_create(&thread[i], NULL, &processPacket, (void *)Packetqueue.front());
+            Packetqueue.pop();
+        }
+        for (int i = 0; i < 100; i++)
+        {
+            pthread_join(thread[i], NULL);
+        }
+    }
 }
 
 // Packet process
-void processPacket(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet)
+void *processPacket(void *_packet)
 {
     // Declare pointers to packet numbers
     const struct ether_header *ethernet_header;
@@ -126,14 +143,15 @@ void processPacket(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *
     const struct udphdr *udp_header;
     const struct icmphdr *icmp_header;
 
+    u_char *packet = (u_char *)_packet;
+
     // Declare IPv4 source and destination address
     char sourIP4[INET_ADDRSTRLEN]; // source address
     char destIP4[INET_ADDRSTRLEN]; // source address
     ethernet_header = (struct ether_header *)(packet);
 
-    int *counter = (int *)arg;
-
-    printf("%s\n", packet);
+    // int *counter = (int *)arg;
+    // printf("%s\n", packet);
 
     switch (ntohs(ethernet_header->ether_type))
     {
@@ -155,7 +173,7 @@ void processPacket(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *
         u_int sourPort = ntohs(tcp_header->th_sport);
         u_int destPort = ntohs(tcp_header->th_dport);
 
-        printf("%s : %d ---> %s : %d", sourIP4, sourPort, destIP4, destPort);
+        printf("%15s : %5d ---> %15s : %5d\n", sourIP4, sourPort, destIP4, destPort);
         break;
     }
 }
