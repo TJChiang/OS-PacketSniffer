@@ -21,6 +21,7 @@
 #include <cctype>
 #include <queue>
 #include <list>
+#include <map>
 
 #define MAX_BYTES_2_CAPTURE 2048
 
@@ -28,10 +29,8 @@ using namespace std;
 queue<const u_char *> Packetqueue;
 
 // Service port number
-typedef enum
-{
-    http = 80
-} ServicePort;
+typedef map<int, const char *> PortServ;
+PortServ portserv;
 
 // Connection Information Structure
 struct ConnectInfo
@@ -40,7 +39,7 @@ struct ConnectInfo
     char DestIP[INET_ADDRSTRLEN];
     u_int SourPort;
     u_int DestPort;
-    ServicePort ServPort;
+    char ServPort[20];
 };
 
 // Record struct ConnectInfo and identify if the Info is the known ports or create a new Info in port table.
@@ -58,6 +57,7 @@ void localip(pcap_if_t *name);
 void Inputqueue(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet);
 // void processPacket(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet);
 void *processPacket(void *packet);
+void PortMap();
 
 int main(int argc, char const *argv[])
 {
@@ -103,6 +103,7 @@ int main(int argc, char const *argv[])
     }
 
     printf("---------------------------------\n");
+    PortMap();
 
     pcap_loop(descr, -1, Inputqueue, (u_char *)&count);
 
@@ -149,6 +150,12 @@ void Inputqueue(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pac
             pthread_join(thread[i], NULL);
         }
     }
+}
+
+void PortMap()
+{
+    portserv.insert(PortServ::value_type(80, "http"));
+    portserv.insert(PortServ::value_type(443, "https"));
 }
 
 // Packet process
@@ -228,7 +235,19 @@ void *processPacket(void *_packet)
                 memcpy(connectinfo.DestIP, sourIP4, INET_ADDRSTRLEN);
                 PortTable.push_back(connectinfo);
             }
-            printf("LocalIP: %15s/%5d, ServIP: %15s/%d\n", connectinfo.SourIP, connectinfo.SourPort, connectinfo.DestIP, connectinfo.DestPort);
+
+            // Check if ServPort is identified
+            try
+            {
+                strcpy(connectinfo.ServPort, portserv.at(connectinfo.DestPort));
+            }
+            catch (exception &er)
+            {
+                strcpy(connectinfo.ServPort, "Unknown");
+            };
+
+            // Print out the result
+            printf("LocalIP: %15s/%5d, ServIP: %15s/%d, Serv: %s\n", connectinfo.SourIP, connectinfo.SourPort, connectinfo.DestIP, connectinfo.DestPort, connectinfo.ServPort);
         }
         // Unlock and accumulate Table
         pthread_mutex_unlock(&mutex);
