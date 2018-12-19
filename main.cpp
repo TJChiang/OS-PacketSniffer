@@ -36,20 +36,20 @@ typedef enum
 // Connection Information Structure
 struct ConnectInfo
 {
-    char *SourIP;
-    char *DestIP;
+    char SourIP[INET_ADDRSTRLEN];
+    char DestIP[INET_ADDRSTRLEN];
     u_int SourPort;
     u_int DestPort;
     ServicePort ServPort;
 };
 
-/*
-    Record struct ConnectInfo and identify if the Info is the known ports or create a new Info in port table.
-*/
-
+// Record struct ConnectInfo and identify if the Info is the known ports or create a new Info in port table.
 // List port table
 list<ConnectInfo> PortTable;
 list<ConnectInfo>::iterator Iter;
+
+// Mutex
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // Prototype
 void localip(pcap_if_t *name);
@@ -66,6 +66,9 @@ int main(int argc, char const *argv[])
 
     // Init errbuf
     memset(errbuf, 0, PCAP_ERRBUF_SIZE);
+
+    // Init mutex
+    pthread_mutex_init(&mutex, NULL);
 
     // Find the default device on which to capture
     int result = pcap_findalldevs(&devices, errbuf);
@@ -98,6 +101,9 @@ int main(int argc, char const *argv[])
     }
 
     pcap_loop(descr, -1, Inputqueue, (u_char *)&count);
+
+    // Close mutex
+    pthread_mutex_destroy(&mutex);
 
     return 0;
 }
@@ -153,8 +159,10 @@ void *processPacket(void *_packet)
     const struct udphdr *udp_header;
     const struct icmphdr *icmp_header;
 
+    // Declare packet
     u_char *packet = (u_char *)_packet;
 
+    // Declare structure
     ConnectInfo connectinfo;
 
     // Declare IPv4 source and destination address
@@ -164,8 +172,6 @@ void *processPacket(void *_packet)
 
     int CountForWhile = 0;
     bool Resultoflist = false;
-    // int *counter = (int *)arg;
-    // printf("%s\n", packet);
 
     switch (ntohs(ethernet_header->ether_type))
     {
@@ -187,8 +193,10 @@ void *processPacket(void *_packet)
         u_int sourPort = ntohs(tcp_header->th_sport);
         u_int destPort = ntohs(tcp_header->th_dport);
 
+        // Lock and accumulate Table
+        pthread_mutex_lock(&mutex);
         // List componets
-        for (Iter = PortTable.begin(); Iter != PortTable.end(); Iter)
+        for (Iter = PortTable.begin(); Iter != PortTable.end(); Iter++)
         {
             if (((strcmp(sourIP4, Iter->SourIP) == 0) && (strcmp(destIP4, Iter->DestIP) == 0) && (sourPort == Iter->SourPort) && (destPort == Iter->DestPort)) ||
                 ((strcmp(sourIP4, Iter->DestIP) == 0) && (strcmp(destIP4, Iter->SourIP) == 0) && (sourPort == Iter->DestPort) && (destPort == Iter->SourPort)))
@@ -201,17 +209,15 @@ void *processPacket(void *_packet)
         {
             connectinfo.SourPort = sourPort;
             connectinfo.DestPort = destPort;
-            connectinfo.SourIP = sourIP4;
-            connectinfo.DestIP = destIP4;
+            memcpy(connectinfo.SourIP, sourIP4, INET_ADDRSTRLEN);
+            memcpy(connectinfo.DestIP, destIP4, INET_ADDRSTRLEN);
             PortTable.push_back(connectinfo);
-            printf("SP: %5d, DP: %5d, SIP: %15s, DIP: %15s\n", sourPort, destPort, sourIP4, destIP4);
+            printf("Source: %15s/%5d, Destination: %15s/%5d\n", sourIP4, sourPort, destIP4, destPort);
         }
+        // Unlock and accumulate Table
+        pthread_mutex_unlock(&mutex);
 
-        // ConnectInfo &i = PortTable.back();
-
-        // printf("%d\n", PortTable.SourPort);
-
-        printf("%15s : %5d ---> %15s : %5d\n", sourIP4, sourPort, destIP4, destPort);
+        // printf("%15s : %5d ---> %15s : %5d\n", sourIP4, sourPort, destIP4, destPort);
         break;
     }
 }
