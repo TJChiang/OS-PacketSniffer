@@ -154,8 +154,20 @@ void Inputqueue(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pac
 
 void PortMap()
 {
-    portserv.insert(PortServ::value_type(80, "http"));
-    portserv.insert(PortServ::value_type(443, "https"));
+    portserv.insert(PortServ::value_type(20, "FTP"));
+    portserv.insert(PortServ::value_type(21, "FTP"));
+    portserv.insert(PortServ::value_type(22, "SSH"));
+    portserv.insert(PortServ::value_type(25, "SMTP"));
+    portserv.insert(PortServ::value_type(53, "DNS"));
+    portserv.insert(PortServ::value_type(80, "HTTP"));
+    portserv.insert(PortServ::value_type(143, "IMAP"));
+    portserv.insert(PortServ::value_type(161, "SNMP"));
+    portserv.insert(PortServ::value_type(220, "IMAP"));
+    portserv.insert(PortServ::value_type(443, "HTTPS"));
+    portserv.insert(PortServ::value_type(465, "SMTPS"));
+    portserv.insert(PortServ::value_type(989, "FTPS"));
+    portserv.insert(PortServ::value_type(990, "FTPS"));
+    portserv.insert(PortServ::value_type(993, "IMAPS"));
 }
 
 // Packet process
