@@ -51,6 +51,8 @@ list<ConnectInfo>::iterator Iter;
 // Mutex
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
+char LocalIP[INET_ADDRSTRLEN];
+
 // Prototype
 void localip(pcap_if_t *name);
 void Inputqueue(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *packet);
@@ -100,6 +102,8 @@ int main(int argc, char const *argv[])
         return -1;
     }
 
+    printf("---------------------------------\n");
+
     pcap_loop(descr, -1, Inputqueue, (u_char *)&count);
 
     // Close mutex
@@ -123,7 +127,8 @@ void localip(pcap_if_t *name)
     ioctl(fd, SIOCGIFADDR, &ifr);
 
     close(fd);
-
+    strncpy(LocalIP, inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr), INET_ADDRSTRLEN);
+    printf("%s\n", LocalIP);
     printf("Local IP address: %s\n", inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
 }
 
@@ -207,12 +212,23 @@ void *processPacket(void *_packet)
         }
         if (Resultoflist == false)
         {
-            connectinfo.SourPort = sourPort;
-            connectinfo.DestPort = destPort;
-            memcpy(connectinfo.SourIP, sourIP4, INET_ADDRSTRLEN);
-            memcpy(connectinfo.DestIP, destIP4, INET_ADDRSTRLEN);
-            PortTable.push_back(connectinfo);
-            printf("Source: %15s/%5d, Destination: %15s/%5d\n", sourIP4, sourPort, destIP4, destPort);
+            if (strcmp(sourIP4, LocalIP) == 0)
+            {
+                connectinfo.SourPort = sourPort;
+                connectinfo.DestPort = destPort;
+                memcpy(connectinfo.SourIP, sourIP4, INET_ADDRSTRLEN);
+                memcpy(connectinfo.DestIP, destIP4, INET_ADDRSTRLEN);
+                PortTable.push_back(connectinfo);
+            }
+            else
+            {
+                connectinfo.SourPort = destPort;
+                connectinfo.DestPort = sourPort;
+                memcpy(connectinfo.SourIP, destIP4, INET_ADDRSTRLEN);
+                memcpy(connectinfo.DestIP, sourIP4, INET_ADDRSTRLEN);
+                PortTable.push_back(connectinfo);
+            }
+            printf("LocalIP: %15s/%5d, ServIP: %15s/%d\n", connectinfo.SourIP, connectinfo.SourPort, connectinfo.DestIP, connectinfo.DestPort);
         }
         // Unlock and accumulate Table
         pthread_mutex_unlock(&mutex);
