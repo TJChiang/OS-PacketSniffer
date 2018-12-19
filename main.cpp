@@ -128,8 +128,7 @@ void localip(pcap_if_t *name)
 
     close(fd);
     strncpy(LocalIP, inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr), INET_ADDRSTRLEN);
-    printf("%s\n", LocalIP);
-    printf("Local IP address: %s\n", inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
+    printf("Local IP address: %s\n", LocalIP);
 }
 
 // Input queue
@@ -212,6 +211,7 @@ void *processPacket(void *_packet)
         }
         if (Resultoflist == false)
         {
+            // Distinguish between Local IP and server IP
             if (strcmp(sourIP4, LocalIP) == 0)
             {
                 connectinfo.SourPort = sourPort;
