@@ -20,6 +20,7 @@
 #include <cstring>
 #include <cctype>
 #include <queue>
+#include <list>
 
 #define MAX_BYTES_2_CAPTURE 2048
 
@@ -35,12 +36,20 @@ typedef enum
 // Connection Information Structure
 struct ConnectInfo
 {
-    char SourIP[20];
-    char DestIP[20];
+    char *SourIP;
+    char *DestIP;
     u_int SourPort;
     u_int DestPort;
     ServicePort ServPort;
 };
+
+/*
+    Record struct ConnectInfo and identify if the Info is the known ports or create a new Info in port table.
+*/
+
+// List port table
+list<ConnectInfo> PortTable;
+list<ConnectInfo>::iterator Iter;
 
 // Prototype
 void localip(pcap_if_t *name);
@@ -135,6 +144,7 @@ void Inputqueue(u_char *arg, const struct pcap_pkthdr *pkthdr, const u_char *pac
 // Packet process
 void *processPacket(void *_packet)
 {
+
     // Declare pointers to packet numbers
     const struct ether_header *ethernet_header;
     const struct ip *ipv4_header;
@@ -145,11 +155,15 @@ void *processPacket(void *_packet)
 
     u_char *packet = (u_char *)_packet;
 
+    ConnectInfo connectinfo;
+
     // Declare IPv4 source and destination address
     char sourIP4[INET_ADDRSTRLEN]; // source address
     char destIP4[INET_ADDRSTRLEN]; // source address
     ethernet_header = (struct ether_header *)(packet);
 
+    int CountForWhile = 0;
+    bool Resultoflist = false;
     // int *counter = (int *)arg;
     // printf("%s\n", packet);
 
@@ -172,6 +186,30 @@ void *processPacket(void *_packet)
         // Get source and destination port number
         u_int sourPort = ntohs(tcp_header->th_sport);
         u_int destPort = ntohs(tcp_header->th_dport);
+
+        // List componets
+        for (Iter = PortTable.begin(); Iter != PortTable.end(); Iter)
+        {
+            if (((strcmp(sourIP4, Iter->SourIP) == 0) && (strcmp(destIP4, Iter->DestIP) == 0) && (sourPort == Iter->SourPort) && (destPort == Iter->DestPort)) ||
+                ((strcmp(sourIP4, Iter->DestIP) == 0) && (strcmp(destIP4, Iter->SourIP) == 0) && (sourPort == Iter->DestPort) && (destPort == Iter->SourPort)))
+            {
+                Resultoflist = true;
+                break;
+            }
+        }
+        if (Resultoflist == false)
+        {
+            connectinfo.SourPort = sourPort;
+            connectinfo.DestPort = destPort;
+            connectinfo.SourIP = sourIP4;
+            connectinfo.DestIP = destIP4;
+            PortTable.push_back(connectinfo);
+            printf("SP: %5d, DP: %5d, SIP: %15s, DIP: %15s\n", sourPort, destPort, sourIP4, destIP4);
+        }
+
+        // ConnectInfo &i = PortTable.back();
+
+        // printf("%d\n", PortTable.SourPort);
 
         printf("%15s : %5d ---> %15s : %5d\n", sourIP4, sourPort, destIP4, destPort);
         break;
